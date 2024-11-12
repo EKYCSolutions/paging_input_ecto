@@ -1,0 +1,83 @@
+
+on:
+  release:
+    types:
+    - published
+  push:
+    branches:
+    - dev
+    - main
+    paths-ignore:
+    - README.md
+    - .gitignore
+    - changelog.md
+  pull_request:
+    types:
+    - synchronize
+    - ready_for_review
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  linting:
+    runs-on: ubuntu-22.04
+    env:
+      MIX_ENV: test
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: erlef/setup-beam@v1
+      with:
+        otp-version: '26'
+        elixir-version: '1.16.3'
+        install-hex: true
+        install-rebar: true
+
+    - run: mix deps.get
+    - run: mix credo
+
+  tests:
+    runs-on: ubuntu-22.04
+    env:
+      MIX_ENV: test
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: erlef/setup-beam@v1
+      with:
+        otp-version: '26'
+        elixir-version: '1.16.3'
+        install-hex: true
+        install-rebar: true
+
+    - run: mix deps.get
+    - run: mix test --cover &> test-result
+
+    - name: get test coverage score
+      id: test_coverage_score
+      run: |
+        cat test-result
+        echo -n "coverage_score=$(cat test-result | grep '\[TOTAL\]' | egrep -o '[0-9.]+')" >> $GITHUB_OUTPUT
+
+    - name: generate test coverage badge
+      uses: jaywcjlove/generated-badges@main
+      with:
+        label: tests-coverage
+        color: ${{ (steps.test_coverage_score.outputs.coverage_score < 64 && 'red') || (steps.test_coverage_score.outputs.coverage_score < 80 && 'yellow') || 'green'}}
+        status: ${{ steps.test_coverage_score.outputs.coverage_score }}%
+        output: tests-coverage-badge.svg
+
+    - name: download aws cli
+      run: |
+        curl https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o awscliv2.zip
+        unzip awscliv2.zip
+        sudo ./aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli --update
+
+    - name: upload test coverage badge
+      run: aws s3 cp tests-coverage-badge.svg s3://${{ vars.BADGES_S3_BUCKET }}/${{ github.repository }}/coverage-badges/${{ github.ref_name }}/tests-coverage-badge.svg
+      env:
+        AWS_DEFAULT_REGION: ${{ vars.BADGES_S3_BUCKET_REGION }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.BADGES_S3_AWS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.BADGES_S3_AWS_SECRET_ACCESS_KEY }}
