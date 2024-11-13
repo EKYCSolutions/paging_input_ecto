@@ -80,5 +80,7 @@ defmodule PagingInputEctoTest do
       |> PagingInputEcto.put_sort_direction(%{"sort_direction" => "asc"})
 
     assert "some_table_1" |> PagingInputEcto.apply_to_ecto_query(paging_input) |> Kernel.inspect() == "#Ecto.Query<from s0 in \"some_table_1\", where: s0.id > ^#{cursor_id}, order_by: [asc: s0.id], limit: ^16>"
+
+    assert PagingInputEcto.apply_to_ecto_query("some_table_2", PagingInputEcto.new()) |> Kernel.inspect() == "#Ecto.Query<from s0 in \"some_table_2\", order_by: [desc: s0.id], limit: ^8>"
   end
 end

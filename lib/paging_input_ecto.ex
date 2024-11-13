@@ -55,6 +55,9 @@ defmodule PagingInputEcto do
   defp apply_cursor_query(query, %__MODULE__{cursor_id: cursor_id, sort_direction: :desc}) when not is_nil(cursor_id),
     do: where(query, [e], e.id < ^cursor_id)
 
+  defp apply_cursor_query(query, _paging_input),
+    do: query
+
   def apply_to_ecto_query(query, %__MODULE__{} = paging_input) do
     query
     |> apply_cursor_query(paging_input)
