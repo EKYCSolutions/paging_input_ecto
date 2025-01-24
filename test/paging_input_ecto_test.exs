@@ -44,21 +44,32 @@ defmodule PagingInputEctoTest do
     assert is_nil(PagingInputEcto.put_cursor_id(paging_input, %{"cursor_id" => "integer:dfjklj"}).cursor_id)
   end
 
+  test "ensure page number value set as desired" do
+    paging_input = PagingInputEcto.new()
+
+    assert PagingInputEcto.put_page_number(paging_input, %{"page_number" => 2}).page_number == 2
+
+    assert is_nil(PagingInputEcto.put_page_number(paging_input, %{"page_numberx" => 2}).page_number)
+  end
+
   test "able to parse query params from Plug.Conn" do
     paging_input = PagingInputEcto.from_conn(%Plug.Conn{query_params: %{
       "page_size" => "20",
       "cursor_id" => "uuidv7:#{UUIDv7.autogenerate()}",
-      "sort_direction" => "asc"
+      "sort_direction" => "asc",
+      "page_number" => "0"
     }})
 
     assert paging_input.page_size == 20
+    assert paging_input.page_number == 0
     assert not is_nil(paging_input.cursor_id)
     assert paging_input.sort_direction == :asc
 
-    paging_input = PagingInputEcto.from_conn(%Plug.Conn{query_params: %{"sort_direction" => "desc", "page_size" => "df"}})
+    paging_input = PagingInputEcto.from_conn(%Plug.Conn{query_params: %{"sort_direction" => "desc", "page_size" => "df", "page_number" => "siu"}})
 
     assert paging_input.page_size == 8
     assert paging_input.sort_direction == :desc
+    assert is_nil(paging_input.page_number)
   end
 
   test "able to apply ecto query correctly" do
@@ -67,6 +78,7 @@ defmodule PagingInputEctoTest do
     paging_input =
       PagingInputEcto.new()
       |> PagingInputEcto.put_page_size(%{"page_size" => 16})
+      |> PagingInputEcto.put_page_number(%{"page_number" => 2})
       |> PagingInputEcto.put_cursor_id(%{"cursor_id" => "uuidv7:#{cursor_id}"})
       |> PagingInputEcto.put_sort_direction(%{"sort_direction" => "desc"})
 
@@ -82,5 +94,7 @@ defmodule PagingInputEctoTest do
     assert "some_table_1" |> PagingInputEcto.apply_to_ecto_query(paging_input) |> Kernel.inspect() == "#Ecto.Query<from s0 in \"some_table_1\", where: s0.id > ^#{cursor_id}, order_by: [asc: s0.id], limit: ^16>"
 
     assert PagingInputEcto.apply_to_ecto_query("some_table_2", PagingInputEcto.new()) |> Kernel.inspect() == "#Ecto.Query<from s0 in \"some_table_2\", order_by: [desc: s0.id], limit: ^8>"
+
+    assert PagingInputEcto.apply_to_ecto_query("some_table_2", %{paging_input | cursor_id: nil}) |> Kernel.inspect() == "#Ecto.Query<from s0 in \"some_table_2\", order_by: [asc: s0.id], limit: ^16, offset: ^32>"
   end
 end
